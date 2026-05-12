@@ -15,6 +15,7 @@
 
 @implementation LynxKeyboardEventDispatcher {
   LynxContext *_context;
+  BOOL _keyboardVisible;
 }
 
 - (instancetype)initWithContext:(LynxContext *)context {
@@ -24,10 +25,16 @@
                                                name:UIKeyboardWillShowNotification
                                              object:nil];
 
-  // Add observer for keyboard exist
+  // Add observer for keyboard exit
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(keyboardWillHide:)
                                                name:UIKeyboardWillHideNotification
+                                             object:nil];
+
+  // Add observer for keyboard frame changes (rotation, iPad undock)
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(keyboardWillChangeFrame:)
+                                               name:UIKeyboardWillChangeFrameNotification
                                              object:nil];
   _context = context;
   _observers = [NSMutableDictionary dictionary];
@@ -74,11 +81,15 @@
 
   [params addObject:isShow];
   [params addObject:aHeight];
+  _keyboardVisible = YES;
   [_context sendGlobalEvent:@KEYBOARD_STATUS_CHANGED withParams:params];
   [_observers enumerateKeysAndObjectsUsingBlock:^(
                   NSNumber *_Nonnull key, LynxWeakProxy *_Nonnull obj, BOOL *_Nonnull stop) {
     id<LynxKeyboardEventObserver> target = obj.target;
     [target keyboardWillShow:height];
+    if ([target respondsToSelector:@selector(onWillShowKeyboard:)]) {
+      [target onWillShowKeyboard:aNotification];
+    }
   }];
 }
 
@@ -93,11 +104,36 @@
 
   [params addObject:isShow];
   [params addObject:aHeight];
+  _keyboardVisible = NO;
   [_context sendGlobalEvent:@KEYBOARD_STATUS_CHANGED withParams:params];
   [_observers enumerateKeysAndObjectsUsingBlock:^(
                   NSNumber *_Nonnull key, LynxWeakProxy *_Nonnull obj, BOOL *_Nonnull stop) {
     id<LynxKeyboardEventObserver> target = obj.target;
     [target keyboardWillHide];
+    if ([target respondsToSelector:@selector(onWillHideKeyboard:)]) {
+      [target onWillHideKeyboard:aNotification];
+    }
+  }];
+}
+
+- (void)keyboardWillChangeFrame:(NSNotification *)aNotification {
+  // Only handle frame changes while the keyboard is already visible (e.g. rotation, iPad undock).
+  // iOS also fires this notification on initial keyboard appearance before WillShow, so skip those.
+  if (!_keyboardVisible) {
+    return;
+  }
+  NSDictionary *userInfo = [aNotification userInfo];
+  NSValue *aValue = [userInfo objectForKey:UIKeyboardFrameEndUserInfoKey];
+  CGRect keyboardRect = [aValue CGRectValue];
+  int height = keyboardRect.size.height;
+  LLog(@"keyboard frame changed, height is %d", height);
+
+  [_observers enumerateKeysAndObjectsUsingBlock:^(
+                  NSNumber *_Nonnull key, LynxWeakProxy *_Nonnull obj, BOOL *_Nonnull stop) {
+    id<LynxKeyboardEventObserver> target = obj.target;
+    if ([target respondsToSelector:@selector(onWillShowKeyboard:)]) {
+      [target onWillShowKeyboard:aNotification];
+    }
   }];
 }
 

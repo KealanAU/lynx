@@ -15,6 +15,12 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)keyboardWillHide;
 
+@optional
+
+- (void)onWillShowKeyboard:(NSNotification *)notification;
+
+- (void)onWillHideKeyboard:(NSNotification *)notification;
+
 @end
 
 @interface LynxKeyboardEventDispatcher : NSObject
