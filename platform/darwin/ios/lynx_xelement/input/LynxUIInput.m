@@ -77,8 +77,6 @@
   textField.clipsToBounds = YES;
   textField.delegate = self;
   textField.secureTextEntry = NO;
-  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onWillShowKeyboard:) name:UIKeyboardWillShowNotification object:nil];
-  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onWillHideKeyboard:) name:UIKeyboardWillHideNotification object:nil];
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(textFieldDidChange:) name:UITextFieldTextDidChangeNotification object:textField];
 
   return textField;

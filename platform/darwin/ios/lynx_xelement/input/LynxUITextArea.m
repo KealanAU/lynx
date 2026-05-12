@@ -50,10 +50,7 @@ static NSInteger kLynxTextAreaOutOfMaxlines = -1;
   textView.showsVerticalScrollIndicator = NO;
   
   kLynxTextAreaEpsilonThreshold = UIScreen.mainScreen.scale;
-  
-  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onWillShowKeyboard:) name:UIKeyboardWillShowNotification object:nil];
-  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onWillHideKeyboard:) name:UIKeyboardWillHideNotification object:nil];
-  
+
   return textView;
 }
 

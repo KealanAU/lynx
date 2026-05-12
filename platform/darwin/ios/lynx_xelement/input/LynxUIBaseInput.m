@@ -75,8 +75,16 @@
   [context.lynxContext addKeyboardEventObserver:self];
 }
 
-- (CGFloat)handleAvoidKeyboard:(BOOL)keyboardDisplayed {
+- (CGFloat)handleAvoidKeyboard:(BOOL)keyboardDisplayed notification:(NSNotification *)notification {
   if (self.avoidKeyboardInLynxView) {
+    NSTimeInterval duration = 0.3;
+    UIViewAnimationOptions animationOptions = UIViewAnimationOptionBeginFromCurrentState;
+    if (notification) {
+      NSDictionary *userInfo = notification.userInfo;
+      duration = [userInfo[UIKeyboardAnimationDurationUserInfoKey] doubleValue];
+      UIViewAnimationCurve curve = (UIViewAnimationCurve)[userInfo[UIKeyboardAnimationCurveUserInfoKey] integerValue];
+      animationOptions = ((NSUInteger)curve << 16) | UIViewAnimationOptionBeginFromCurrentState;
+    }
     if (keyboardDisplayed) {
       if (self.view.isFirstResponder) {
         CGRect rectInRoot = [self.view convertRect:self.view.bounds toView:nil];
@@ -86,17 +94,23 @@
           if (gap > 0) {
             CGRect targetFrame = self.context.rootView.frame;
             targetFrame.origin.y -= gap;
-            [UIView animateWithDuration:0.3 animations:^{
+            [UIView animateWithDuration:duration
+                                  delay:0.0
+                                options:animationOptions
+                             animations:^{
               [self.context.rootView setFrame:targetFrame];
-            }];
+            } completion:nil];
             return gap;
           }
         } else {
           CGRect targetFrame = self.context.rootView.frame;
           targetFrame.origin.y -= gap;
-          [UIView animateWithDuration:0.3 animations:^{
+          [UIView animateWithDuration:duration
+                                delay:0.0
+                              options:animationOptions
+                           animations:^{
             [self.context.rootView setFrame:targetFrame];
-          }];
+          } completion:nil];
           return gap;
         }
       }
@@ -104,9 +118,12 @@
       if (self.avoidKeyboardDist != 0) {
         CGRect targetFrame = self.context.rootView.frame;
         targetFrame.origin.y += self.avoidKeyboardDist;
-        [UIView animateWithDuration:0.3 animations:^{
+        [UIView animateWithDuration:duration
+                              delay:0.0
+                            options:animationOptions
+                         animations:^{
           [self.context.rootView setFrame:targetFrame];
-        }];
+        } completion:nil];
       }
     }
   }
@@ -114,25 +131,16 @@
 }
 
 - (void)keyboardWillShow:(CGFloat)keyboardHeight {
-  if (self.view.isFirstResponder) {
-    self.wasFocused = NO;
-    self.keyboardHeight = keyboardHeight;
-    self.avoidKeyboardDist = [self handleAvoidKeyboard:YES];
-    [self emitEvent:@"keyboardheightchange" detail:@{@"height" : @(keyboardHeight)}];
-  }
+  // Store the current keyboard height so that layoutDidFinished can use it.
+  // The full keyboard-show handling (animation, events) is done in onWillShowKeyboard:
+  // which is called immediately after this by the dispatcher for richer notification data.
+  self.keyboardHeight = keyboardHeight;
 }
 
 - (void)keyboardWillHide {
   // Match the hide callback with the input that actually owned the previous
   // avoid-keyboard offset instead of the new first responder during focus handoff.
-  // Retain self cause that `inputViewDidEndEditing` is triggered after `keyboardWillHide`
-  dispatch_async(dispatch_get_main_queue(), ^{
-    if (self.wasFocused) {
-      self.wasFocused = NO;
-      self.avoidKeyboardDist = [self handleAvoidKeyboard:NO];
-      [self emitEvent:@"keyboardheightchange" detail:@{@"height" : @(0)}];
-    }
-  });
+  // The full handling is done in onWillHideKeyboard: which is called immediately after this.
 }
 
 - (void)onFontFaceLoad {
@@ -418,7 +426,7 @@ LYNX_PROP_SETTER("hold-keyboard", setHoldKeyboard, BOOL) {
 
 - (void)layoutDidFinished {
   [super layoutDidFinished];
-  self.avoidKeyboardDist += [self handleAvoidKeyboard:YES];
+  self.avoidKeyboardDist += [self handleAvoidKeyboard:YES notification:nil];
 }
 
 - (BOOL)shouldHitTest:(CGPoint)point withEvent:(nullable UIEvent*)event {
@@ -726,13 +734,10 @@ LYNX_UI_METHOD(setSelectionRange) {
 
 
 - (void)onWillShowKeyboard:(NSNotification *)notification {
-  
   CGRect keyboardFrame = [notification.userInfo[UIKeyboardFrameEndUserInfoKey] CGRectValue];
-  
   CGFloat keyboardHeight = keyboardFrame.size.height;
-  
+
   CGFloat safeAreaBottom = 0;
-  
   if (@available(iOS 11.0, *)) {
     safeAreaBottom = self.view.safeAreaInsets.bottom;
   }
@@ -742,12 +747,29 @@ LYNX_UI_METHOD(setSelectionRange) {
     @"keyboardHeight" : @(keyboardHeight),
     @"safeAreaBottom" : @(safeAreaBottom),
   }];
+
+  if (self.view.isFirstResponder) {
+    self.wasFocused = NO;
+    self.keyboardHeight = keyboardHeight;
+    self.avoidKeyboardDist = [self handleAvoidKeyboard:YES notification:notification];
+    [self emitEvent:@"keyboardheightchange" detail:@{@"height" : @(keyboardHeight)}];
+  }
 }
 
 - (void)onWillHideKeyboard:(NSNotification *)notification {
   [self emitEvent:@"keyboard" detail:@{
     @"show" : @(NO),
   }];
+
+  // Match the hide callback with the input that actually owned the previous
+  // avoid-keyboard offset instead of the new first responder during focus handoff.
+  dispatch_async(dispatch_get_main_queue(), ^{
+    if (self.wasFocused) {
+      self.wasFocused = NO;
+      self.avoidKeyboardDist = [self handleAvoidKeyboard:NO notification:notification];
+      [self emitEvent:@"keyboardheightchange" detail:@{@"height" : @(0)}];
+    }
+  });
 }
 
 - (void)emitEvent:(NSString*) name detail:(NSDictionary*)detail {
