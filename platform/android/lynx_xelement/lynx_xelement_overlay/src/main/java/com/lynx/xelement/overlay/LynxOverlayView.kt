@@ -12,7 +12,9 @@ import android.graphics.Rect
 import android.os.Build
 import android.view.*
 import androidx.annotation.RequiresApi
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import com.lynx.react.bridge.Dynamic
 import com.lynx.react.bridge.ReadableType
 import com.lynx.tasm.LynxError
@@ -91,6 +93,7 @@ class LynxOverlayView(context: LynxContext, val proxy: LynxUIOverlay) : UIGroup<
     private var mGlobalLayoutListener : ViewTreeObserver.OnGlobalLayoutListener? = null
     private var mScrollChangedListener : ViewTreeObserver.OnScrollChangedListener? = null
     private var mDrawListener : ViewTreeObserver.OnDrawListener? = null
+    private var mOverlayImeDecorView : View? = null
 
     init {
         // do not dim the window behind
@@ -616,6 +619,19 @@ class LynxOverlayView(context: LynxContext, val proxy: LynxUIOverlay) : UIGroup<
                     val errorCode = mDialog.checkContextErrorCode(activity)
                     if (errorCode >= 0) {
                         mDialog.show()
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            val decorView = mDialog.window?.decorView
+                            if (decorView != null) {
+                                mOverlayImeDecorView = decorView
+                                val dpi = lynxContext.screenMetrics.density
+                                ViewCompat.setOnApplyWindowInsetsListener(decorView) { _, insets ->
+                                    val imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
+                                    val imeHeightDp = (insets.getInsets(WindowInsetsCompat.Type.ime()).bottom / dpi).toInt()
+                                    lynxContext.lynxView?.keyboardEvent?.dispatchImeInsets(imeVisible, imeHeightDp)
+                                    insets
+                                }
+                            }
+                        }
                     }
                     sendShowOverlayEvent(errorCode, activity)
                     mObserver = mOverlayContainer?.viewTreeObserver
@@ -657,6 +673,10 @@ class LynxOverlayView(context: LynxContext, val proxy: LynxUIOverlay) : UIGroup<
                 mObserver?.removeOnGlobalLayoutListener(mGlobalLayoutListener)
                 mObserver?.removeOnScrollChangedListener(mScrollChangedListener)
                 mObserver?.removeOnDrawListener(mDrawListener)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    mOverlayImeDecorView?.let { ViewCompat.setOnApplyWindowInsetsListener(it, null) }
+                    mOverlayImeDecorView = null
+                }
             } catch (e: WindowManager.BadTokenException) {
                 LLog.w(TAG, e.toString())
             } catch (e: RuntimeException) {
@@ -749,6 +769,10 @@ class LynxOverlayView(context: LynxContext, val proxy: LynxUIOverlay) : UIGroup<
                 mObserver?.removeOnGlobalLayoutListener(mGlobalLayoutListener)
                 mObserver?.removeOnScrollChangedListener(mScrollChangedListener)
                 mObserver?.removeOnDrawListener(mDrawListener)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    mOverlayImeDecorView?.let { ViewCompat.setOnApplyWindowInsetsListener(it, null) }
+                    mOverlayImeDecorView = null
+                }
             } catch (e: WindowManager.BadTokenException) {
                 LLog.w(TAG, e.toString())
             } catch (e: RuntimeException) {
