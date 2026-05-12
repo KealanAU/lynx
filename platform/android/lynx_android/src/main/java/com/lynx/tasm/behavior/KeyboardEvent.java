@@ -14,6 +14,8 @@ import android.view.Surface;
 import android.view.View;
 import android.view.ViewTreeObserver;
 import androidx.appcompat.widget.LinearLayoutCompat;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.OrientationHelper;
 import com.lynx.react.bridge.JavaOnlyArray;
 import com.lynx.tasm.base.LLog;
@@ -159,7 +161,6 @@ public class KeyboardEvent {
         });
         return;
       }
-      // TODO(zhangkaijie.9): use getRootWindowInsets().isVisible(WindowInsetsCompat.Type.ime())
       boolean visible = visibleRatio < KEYBOARD_HIGHER_THRESHOLD;
       int keyboardHeight = 0;
       int keyboardHeightCompat = 0;
@@ -204,20 +205,42 @@ public class KeyboardEvent {
       LLog.e(LynxConstants.TAG, "KeyboardEvent's context must be Activity");
       return;
     }
-    if (mKeyboardMonitor == null) {
-      mKeyboardMonitor = new KeyboardMonitor(activity);
-    }
 
-    mListener = new ViewTreeObserver.OnGlobalLayoutListener() {
-      @Override
-      public void onGlobalLayout() {
-        LLog.d(LynxConstants.TAG, "onGlobalLayout invoked.");
-        detectKeyboardChangeAndSendEvent();
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+      // Use WindowInsetsCompat for accurate IME height on API 23+.
+      final View rootView = activity.getWindow().getDecorView();
+      ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
+        boolean imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime());
+        int imeHeightPx = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom;
+        int imeHeightDp = (int) (imeHeightPx / mDpi);
+        LLog.d(LynxConstants.TAG,
+            "WindowInsetsCompat: imeVisible=" + imeVisible + ", height=" + imeHeightDp);
+        if ((imeHeightDp != keyboardHeightForLast)
+            || (imeVisible != (keyboardHeightForLast > 0))) {
+          sendKeyboardEvent(imeVisible, imeHeightDp, imeHeightDp);
+          keyboardHeightForLast = imeHeightDp;
+          keyboardTopFromLynxView = imeHeightDp;
+        }
+        dispatchOnGlobalLayout();
+        return insets;
+      });
+    } else {
+      // Fallback to KeyboardMonitor for API < 23.
+      if (mKeyboardMonitor == null) {
+        mKeyboardMonitor = new KeyboardMonitor(activity);
       }
-    };
 
-    mKeyboardMonitor.addOnGlobalLayoutListener(mListener);
-    mKeyboardMonitor.start();
+      mListener = new ViewTreeObserver.OnGlobalLayoutListener() {
+        @Override
+        public void onGlobalLayout() {
+          LLog.d(LynxConstants.TAG, "onGlobalLayout invoked.");
+          detectKeyboardChangeAndSendEvent();
+        }
+      };
+
+      mKeyboardMonitor.addOnGlobalLayoutListener(mListener);
+      mKeyboardMonitor.start();
+    }
     isStartedInUIThread = true;
   }
 
@@ -245,9 +268,17 @@ public class KeyboardEvent {
   private void stopInMain() {
     LLog.d(LynxConstants.TAG, "KeyboardEvent stopping");
     try {
-      if (mListener != null && mKeyboardMonitor != null) {
-        mKeyboardMonitor.removeOnGlobalLayoutListener(mListener);
-        mKeyboardMonitor.stop();
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        Activity activity = ContextUtils.getActivity(mLynxContext);
+        if (activity != null) {
+          View rootView = activity.getWindow().getDecorView();
+          ViewCompat.setOnApplyWindowInsetsListener(rootView, null);
+        }
+      } else {
+        if (mListener != null && mKeyboardMonitor != null) {
+          mKeyboardMonitor.removeOnGlobalLayoutListener(mListener);
+          mKeyboardMonitor.stop();
+        }
       }
     } catch (Exception e) {
       LLog.w(LynxConstants.TAG, "stop KeyboardEvent failed for " + e.toString());
@@ -299,6 +330,18 @@ public class KeyboardEvent {
   public void addKeyboardEventObserver(KeyboardEventObserver observer) {
     if (observer != null) {
       mObservers.put(observer, observer);
+    }
+  }
+
+  /**
+   * Dispatch keyboard height directly from a pre-computed IME inset, e.g. from an overlay window
+   * that has its own WindowInsets context. Height should be in dp.
+   */
+  public void dispatchImeInsets(boolean imeVisible, int imeHeightDp) {
+    if ((imeHeightDp != keyboardHeightForLast) || (imeVisible != (keyboardHeightForLast > 0))) {
+      sendKeyboardEvent(imeVisible, imeHeightDp, imeHeightDp);
+      keyboardHeightForLast = imeHeightDp;
+      keyboardTopFromLynxView = imeHeightDp;
     }
   }
 }
