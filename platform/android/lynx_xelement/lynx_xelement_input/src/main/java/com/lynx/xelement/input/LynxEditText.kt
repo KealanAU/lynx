@@ -111,6 +111,14 @@ open class LynxEditText: androidx.appcompat.widget.AppCompatEditText, IRendererH
         inputConnection?.removeBackspaceListener()
     }
 
+    fun setKeyEventListener(listener: LynxInputConnectionWrapper.KeyEventListener?) {
+        inputConnection?.setKeyEventListener(listener)
+    }
+
+    fun removeKeyEventListener() {
+        inputConnection?.removeKeyEventListener()
+    }
+
     fun setCopyListener(copyListener: CopyListener) {
         mCopyListener = copyListener
     }

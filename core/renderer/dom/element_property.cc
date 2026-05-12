@@ -28,7 +28,9 @@ namespace tasm {
   V("x-inline-text", ElementBuiltInTagEnum::ELEMENT_X_INLINE_TEXT) \
   V("x-nested-scroll-view",                                        \
     ElementBuiltInTagEnum::ELEMENT_X_NESTED_SCROLL_VIEW)           \
-  V("inline-image", ElementBuiltInTagEnum::ELEMENT_INLINE_IMAGE)
+  V("inline-image", ElementBuiltInTagEnum::ELEMENT_INLINE_IMAGE)   \
+  V("input", ElementBuiltInTagEnum::ELEMENT_INPUT)                 \
+  V("textarea", ElementBuiltInTagEnum::ELEMENT_TEXTAREA)
 
 ElementBuiltInTagEnum ElementProperty::ConvertStringTagToEnumTag(
     const base::static_string::GenericCacheKey& string_tag) {

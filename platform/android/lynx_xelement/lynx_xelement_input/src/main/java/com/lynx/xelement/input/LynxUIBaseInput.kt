@@ -22,6 +22,7 @@ import android.text.method.SingleLineTransformationMethod
 import android.text.style.AbsoluteSizeSpan
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -236,6 +237,14 @@ open class LynxUIBaseInput(context: LynxContext, params: Any?) : LynxUI<LynxEdit
           it.keyboardEvent.start()
           it.keyboardEvent.addKeyboardEventObserver(this)
         }
+        editText.setKeyEventListener(object : LynxInputConnectionWrapper.KeyEventListener {
+            override fun onKeyEvent(keyCode: Int, action: Int, metaState: Int) {
+                val bodyView = mContext.getUIBodyView() ?: return
+                val renderer = bodyView.getLynxUIRendererInternal()
+                val event = KeyEvent(0L, 0L, action, keyCode, 0, metaState)
+                renderer?.dispatchKeyEvent(event)
+            }
+        })
         editText.hint = ""
         // If context is application, the focusableInTouchMode in default style may be false
         editText.isFocusableInTouchMode = true

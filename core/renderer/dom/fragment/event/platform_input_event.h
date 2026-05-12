@@ -5,23 +5,32 @@
 #ifndef CORE_RENDERER_DOM_FRAGMENT_EVENT_PLATFORM_INPUT_EVENT_H_
 #define CORE_RENDERER_DOM_FRAGMENT_EVENT_PLATFORM_INPUT_EVENT_H_
 
+#include <string>
+
 namespace lynx {
 namespace tasm {
 
 class PlatformInputEvent {
  public:
-  PlatformInputEvent(int int_event_data[], float float_event_data[]);
+  PlatformInputEvent(int int_event_data[], float float_event_data[],
+                     const char* key_string = nullptr);
 
   int EventType() const { return event_type_; }
   int ActionType() const { return action_type_; }
   int EventSource() const { return event_source_; }
   long TimeStamp() const { return time_stamp_; }
+  int KeyCode() const { return key_code_; }
+  int ModifierFlags() const { return modifier_flags_; }
+  const std::string& KeyString() const { return key_string_; }
 
  private:
   int event_type_{0};
   int action_type_{0};
   int event_source_{0};
   long time_stamp_{0};
+  int key_code_{0};
+  int modifier_flags_{0};
+  std::string key_string_;
 };
 
 }  // namespace tasm
