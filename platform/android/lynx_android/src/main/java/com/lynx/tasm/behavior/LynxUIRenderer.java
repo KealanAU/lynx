@@ -551,6 +551,12 @@ public class LynxUIRenderer implements ILynxUIRenderer {
 
   @Override
   public boolean dispatchKeyEvent(KeyEvent event) {
+    LynxContext context = mLynxContext.get();
+    if (context != null && context.isFragmentLayerRenderOn()
+        && mPaintingContext instanceof NativePaintingContext) {
+      ((NativePaintingContext) mPaintingContext)
+          .dispatchPlatformKeyEvent(event.getKeyCode(), event.getAction(), event.getMetaState());
+    }
     return false;
   }
 

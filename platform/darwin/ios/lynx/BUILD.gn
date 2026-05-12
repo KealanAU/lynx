@@ -453,6 +453,8 @@ subspec_target("UnitTests") {
     "base/background/LynxBoxShadowLayerUnitTest.m",
     "event/Test/LynxEventHandlerUnitTest.h",
     "event/Test/LynxEventHandlerUnitTest.mm",
+    "event/Test/LynxKeyboardEventDispatcherUnitTest.h",
+    "event/Test/LynxKeyboardEventDispatcherUnitTest.m",
     "event/Test/LynxTouchHandlerUnitTest.h",
     "event/Test/LynxTouchHandlerUnitTest.mm",
     "gesture/LynxBaseGestureHandlerUnitTest.m",

@@ -83,6 +83,21 @@ unittest_set("display_list_testset") {
   ]
 }
 
+unittest_set("platform_event_keyboard_testset") {
+  testonly = true
+  sources = [
+    "event/platform_event_handler_keyboard_unittest.cc",
+    "event/platform_event_target_focus_unittest.cc",
+  ]
+  public_deps = [
+    ":fragment",
+    "../../../../base/src:base_values",
+  ]
+}
+
 unittest_exec("fragment_test_exec") {
-  deps = [ ":display_list_testset" ]
+  deps = [
+    ":display_list_testset",
+    ":platform_event_keyboard_testset",
+  ]
 }

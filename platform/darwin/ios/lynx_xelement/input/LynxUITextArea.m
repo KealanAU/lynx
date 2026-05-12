@@ -6,6 +6,8 @@
 #import <Lynx/LynxUIOwner.h>
 #import <Lynx/LynxPropsProcessor.h>
 #import <Lynx/LynxNativeLayoutNode.h>
+#import <Lynx/LynxView+Internal.h>
+#import <Lynx/LynxTemplateRender+Internal.h>
 
 static NSInteger gTextareaLightTag = 23333;
 static CGFloat kLynxTextAreaEpsilonThreshold = 1.0f;
@@ -48,10 +50,7 @@ static NSInteger kLynxTextAreaOutOfMaxlines = -1;
   textView.showsVerticalScrollIndicator = NO;
   
   kLynxTextAreaEpsilonThreshold = UIScreen.mainScreen.scale;
-  
-  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onWillShowKeyboard:) name:UIKeyboardWillShowNotification object:nil];
-  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onWillHideKeyboard:) name:UIKeyboardWillHideNotification object:nil];
-  
+
   return textView;
 }
 
@@ -312,19 +311,39 @@ LYNX_UI_METHOD(setValue) {
   [self textViewDidChange:(UITextView *)input];
 }
 
-- (BOOL)textView:(UITextView *)textView shouldChangeTextInRange:(NSRange)range replacementText:(NSString *)text {
-  if ([text isEqualToString:@"\n"] && textView.returnKeyType != UIReturnKeyDefault) {
-    // If the confirm-type is not "default"(next-line), send confirm manually, cause UITextView do not have the callback of `textFieldShouldReturn:`
-    return [self inputViewShouldReturn:textView];
+- (void)dispatchKeyEventWithKeyCode:(NSInteger)keyCode keyString:(NSString *)keyString {
+  LynxTemplateRender* templateRender =
+      ((LynxView *)self.context.rootView).templateRender;
+  if (!templateRender) {
+    return;
   }
-  
+  // iEventData: [event_type=1(keyboard), action_type=0(down), event_source=0,
+  //              key_code, modifier_flags]
+  NSArray *iDownData = @[ @1, @0, @0, @(keyCode), @0 ];
+  NSArray *iUpData   = @[ @1, @1, @0, @(keyCode), @0 ];
+  NSArray *fData     = @[];
+  [templateRender DispatchPlatformInputEvent:iDownData withData:fData];
+  [templateRender DispatchPlatformInputEvent:iUpData withData:fData];
+}
+
+- (BOOL)textView:(UITextView *)textView shouldChangeTextInRange:(NSRange)range replacementText:(NSString *)text {
+  if ([text isEqualToString:@"\n"]) {
+    [self dispatchKeyEventWithKeyCode:13 keyString:@"Enter"];
+    if (textView.returnKeyType != UIReturnKeyDefault) {
+      // If the confirm-type is not "default"(next-line), send confirm manually, cause UITextView do not have the callback of `textFieldShouldReturn:`
+      return [self inputViewShouldReturn:textView];
+    }
+  } else if (text.length == 0 && range.length > 0) {
+    [self dispatchKeyEventWithKeyCode:8 keyString:@"Backspace"];
+  }
+
   // The last line needs to be filtered when it is '\n'. This is essentially to be compatible with a bug from UIKit.
   NSArray<NSString *> *currentLines = [textView.text componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet];
   NSArray<NSString *> *comingLines = [text componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet];
   if ( currentLines.count + comingLines.count - 1 > self.maxlines) {
     return NO;
   }
-  
+
   return [self inputView:textView shouldChangeCharactersInRange:range replacementString:text];
 }
 

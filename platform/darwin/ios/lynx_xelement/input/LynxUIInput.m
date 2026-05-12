@@ -9,6 +9,8 @@
 #import <Lynx/LynxFontFaceManager.h>
 #import <Lynx/LynxConverter+UI.h>
 #import <Lynx/LynxColorUtils.h>
+#import <Lynx/LynxView+Internal.h>
+#import <Lynx/LynxTemplateRender+Internal.h>
 
 @interface LynxTextFieldLite : UITextField
 
@@ -75,8 +77,6 @@
   textField.clipsToBounds = YES;
   textField.delegate = self;
   textField.secureTextEntry = NO;
-  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onWillShowKeyboard:) name:UIKeyboardWillShowNotification object:nil];
-  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onWillHideKeyboard:) name:UIKeyboardWillHideNotification object:nil];
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(textFieldDidChange:) name:UITextFieldTextDidChangeNotification object:textField];
 
   return textField;
@@ -139,7 +139,23 @@ LYNX_UI_METHOD(setValue) {
   self.view.text = dest;
 }
 
+- (void)dispatchKeyEventWithKeyCode:(NSInteger)keyCode keyString:(NSString *)keyString {
+  LynxTemplateRender* templateRender =
+      ((LynxView *)self.context.rootView).templateRender;
+  if (!templateRender) {
+    return;
+  }
+  // iEventData: [event_type=1(keyboard), action_type=0(down), event_source=0,
+  //              key_code, modifier_flags]
+  NSArray *iDownData = @[ @1, @0, @0, @(keyCode), @0 ];
+  NSArray *iUpData   = @[ @1, @1, @0, @(keyCode), @0 ];
+  NSArray *fData     = @[];
+  [templateRender DispatchPlatformInputEvent:iDownData withData:fData];
+  [templateRender DispatchPlatformInputEvent:iUpData withData:fData];
+}
+
 - (BOOL)textFieldShouldReturn:(UITextField *)textField {
+  [self dispatchKeyEventWithKeyCode:13 keyString:@"Enter"];
   return [self inputViewShouldReturn:textField];
 }
 
@@ -148,6 +164,9 @@ LYNX_UI_METHOD(setValue) {
 }
 
 - (BOOL)textField:(UITextField *)textField shouldChangeCharactersInRange:(NSRange)range replacementString:(NSString *)string {
+  if (string.length == 0 && range.length > 0) {
+    [self dispatchKeyEventWithKeyCode:8 keyString:@"Backspace"];
+  }
   return [self inputView:textField shouldChangeCharactersInRange:range replacementString:string];
 }
 

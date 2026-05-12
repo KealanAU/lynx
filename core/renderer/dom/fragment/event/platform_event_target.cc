@@ -7,6 +7,8 @@
 #include <cstring>
 #include <utility>
 
+#include "core/event/event.h"
+#include "core/renderer/dom/fragment/event/platform_event_emitter.h"
 #include "core/renderer/dom/fragment/event/platform_event_target_helper.h"
 
 namespace lynx {
@@ -204,9 +206,19 @@ void PlatformEventTarget::OffResponseChain() {}
 bool PlatformEventTarget::IsOnResponseChain() const { return false; }
 
 void PlatformEventTarget::OnFocusChange(bool has_focus,
-                                        bool is_focus_transition) {}
+                                        bool is_focus_transition) {
+  if (emitter_ == nullptr) {
+    return;
+  }
+  const std::string event_name = has_focus ? "focus" : "blur";
+  auto evt = fml::MakeRefCounted<event::Event>(
+      event_name, event::Event::EventType::kUIEvent,
+      event::Event::Capture::kYes, event::Event::Bubbles::kNo,
+      event::Event::Cancelable::kNo, event::Event::ComposedMode::kComposed);
+  emitter_->SendEvent(sign_, evt);
+}
 
-bool PlatformEventTarget::Focusable() const { return true; }
+bool PlatformEventTarget::Focusable() const { return focusable_; }
 
 void PlatformEventTarget::OnPseudoStatusChanged(
     LynxPseudoStatus pre_status, LynxPseudoStatus current_status) {}

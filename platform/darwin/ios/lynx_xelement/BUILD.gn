@@ -59,6 +59,7 @@ podspec_target("XElement_podspec") {
     ":Refresh",
     ":SVG",
     ":ScrollCoordinator",
+    ":UnitTests",
     ":ViewPager",
     ":WebView",
   ]
@@ -311,5 +312,19 @@ subspec_target("Behavior") {
     "XElement/WebView",
     "XElement/SVG",
     "XElement/Refresh",
+  ]
+}
+
+subspec_target("UnitTests") {
+  test_subspec = true
+  sources = [
+    "input/test/LynxUIBaseInputUnitTest.h",
+    "input/test/LynxUIBaseInputUnitTest.m",
+  ]
+  dependency = [
+    "XElement/Input",
+    "Lynx/Framework",
+    "XcodeCoverage",
+    "OCMock",
   ]
 }

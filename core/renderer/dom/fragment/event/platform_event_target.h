@@ -23,6 +23,7 @@ namespace lynx {
 namespace tasm {
 
 class PlatformEventTargetHelper;
+class PlatformEventEmitter;
 
 enum class LynxEventPropStatus {
   kUndefined,
@@ -72,6 +73,8 @@ class PlatformEventTarget : public fml::RefCountedThreadSafeStorage {
         width_(width),
         height_(height),
         target_helper_(target_helper) {}
+
+  void SetEventEmitter(PlatformEventEmitter* emitter) { emitter_ = emitter; }
   void ReleaseSelf() const override { delete this; }
   // because the target may be reconstructed, we need to check if the current
   // parent is the target with sign.
@@ -156,6 +159,7 @@ class PlatformEventTarget : public fml::RefCountedThreadSafeStorage {
 
   void OnFocusChange(bool has_focus, bool is_focus_transition);
   bool Focusable() const;
+  void SetFocusable(bool focusable) { focusable_ = focusable; }
   void OnPseudoStatusChanged(LynxPseudoStatus pre_status,
                              LynxPseudoStatus current_status);
   LynxPseudoStatus GetPseudoStatus() const;
@@ -244,6 +248,7 @@ class PlatformEventTarget : public fml::RefCountedThreadSafeStorage {
   float exposure_ui_margin_bottom_{0.f};
   float exposure_area_ratio_{0.f};
   LynxEventPropStatus enable_exposure_ui_clip_{LynxEventPropStatus::kUndefined};
+  bool focusable_{false};
   std::string id_selector_;
   std::string exposure_id_;
   std::string exposure_scene_;
@@ -253,6 +258,7 @@ class PlatformEventTarget : public fml::RefCountedThreadSafeStorage {
   fml::RefPtr<PlatformEventTarget> parent_{nullptr};
   ChildrenTargetVec children_;
   PlatformEventTargetHelper* target_helper_{nullptr};
+  PlatformEventEmitter* emitter_{nullptr};
 };
 
 }  // namespace tasm
