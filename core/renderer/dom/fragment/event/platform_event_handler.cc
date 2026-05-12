@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "base/include/float_comparison.h"
+#include "core/event/keyboard_event.h"
 #include "core/event/touch_event.h"
 #include "core/renderer/dom/fragment/event/platform_event_target_helper.h"
 #include "core/renderer/dom/fragment/event/platform_input_event.h"
@@ -75,8 +76,26 @@ bool PlatformEventHandler::OnInputEvent(
       }
       break;
     }
-    // TODO(hexionghui): support keyboard event
+    // keyboard event
     case 1: {
+      if (!focused_target_) {
+        break;
+      }
+      auto keyboard_event = PlatformInputEvent(int_event_data, float_event_data);
+      const std::string& event_name =
+          keyboard_event.ActionType() == 1 ? event::KeyboardEvent::EVENT_KEY_UP : event::KeyboardEvent::EVENT_KEY_DOWN;
+      const int modifier_flags = keyboard_event.ModifierFlags();
+      auto evt = fml::MakeRefCounted<event::KeyboardEvent>(
+          event_name, keyboard_event.KeyString(),
+          keyboard_event.KeyString(),
+          keyboard_event.KeyCode(),
+          (modifier_flags & 0x02) != 0,
+          (modifier_flags & 0x01) != 0,
+          (modifier_flags & 0x04) != 0,
+          (modifier_flags & 0x08) != 0,
+          keyboard_event.ActionType() == 2,
+          false);
+      platform_ref_->GetEventEmitter()->SendEvent(focused_target_->Sign(), evt);
       break;
     }
     default:

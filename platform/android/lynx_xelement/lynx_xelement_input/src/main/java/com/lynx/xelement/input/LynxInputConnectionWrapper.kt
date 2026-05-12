@@ -16,9 +16,22 @@ class LynxInputConnectionWrapper(target: InputConnection?, mutable: Boolean) :
 
     private var mBackspaceListener: BackspaceListener? = null
     private var mEditTextRelated: EditText? = null
+    private var mKeyEventListener: KeyEventListener? = null
 
     interface BackspaceListener {
         fun onBackspace(): Boolean
+    }
+
+    interface KeyEventListener {
+        fun onKeyEvent(keyCode: Int, action: Int, metaState: Int)
+    }
+
+    fun setKeyEventListener(listener: KeyEventListener?) {
+        mKeyEventListener = listener
+    }
+
+    fun removeKeyEventListener() {
+        mKeyEventListener = null
     }
 
     fun bindEditText(editText: EditText) {
@@ -32,6 +45,10 @@ class LynxInputConnectionWrapper(target: InputConnection?, mutable: Boolean) :
             if (mBackspaceListener != null && mBackspaceListener!!.onBackspace()) {
                 return true
             }
+            mKeyEventListener?.onKeyEvent(
+                KeyEvent.KEYCODE_DEL, KeyEvent.ACTION_DOWN, 0)
+            mKeyEventListener?.onKeyEvent(
+                KeyEvent.KEYCODE_DEL, KeyEvent.ACTION_UP, 0)
         }
         return super.deleteSurroundingText(beforeLength, afterLength)
     }
@@ -63,6 +80,7 @@ class LynxInputConnectionWrapper(target: InputConnection?, mutable: Boolean) :
                 return true
             }
         }
+        mKeyEventListener?.onKeyEvent(event.keyCode, event.action, event.metaState)
         return super.sendKeyEvent(event)
     }
 
