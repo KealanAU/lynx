@@ -3441,9 +3441,9 @@ void FiberElement::RecursivelyMarkChildrenCSSVariableDirty(
     bool child_related = IsRelatedCSSVariableUpdated(
         fiber_child->data_model(), css_variable_updated_merged);
     // [VYUI_VAR] dark-mode propagation probe — remove after diagnosis.
-    LOGI("[VYUI_VAR] child holder="
-         << static_cast<void *>(fiber_child->data_model())
-         << " markStyleDirty=" << child_related);
+    printf("[VYUI_VAR] child holder=%p markStyleDirty=%d\n",
+           static_cast<void *>(fiber_child->data_model()), child_related);
+    fflush(stdout);
     if (child_related) {
       fiber_child->MarkStyleDirty(false);
     }
@@ -3683,11 +3683,12 @@ bool FiberElement::IsRelatedCSSVariableUpdated(
         std::string k(key.String().c_str());
         if (k.find("ui-bg") != std::string::npos ||
             k.find("ui-text") != std::string::npos) {
-          LOGI("[VYUI_VAR] gate holder=" << static_cast<void *>(holder)
-               << " key=" << k.c_str()
-               << " stored=" << (related ? it->second.c_str() : "<none>")
-               << " incoming=" << value.String().c_str()
-               << " related=" << related << " differs=" << differs);
+          printf("[VYUI_VAR] gate holder=%p key=%s stored=%s incoming=%s "
+                 "related=%d differs=%d\n",
+                 static_cast<void *>(holder), k.c_str(),
+                 related ? it->second.c_str() : "<none>",
+                 value.String().c_str(), related, differs);
+          fflush(stdout);
         }
         // FIX: invalidate on membership, not on a stored-vs-incoming value
         // compare. `it->second` is the *resolved* value recorded at resolution
@@ -4967,8 +4968,9 @@ bool FiberElement::CollectCustomProperties(AttributeHolder *holder) {
     // [VYUI_VAR] dark-mode propagation probe — remove after diagnosis.
     // If this fires for a node whose ancestor var just changed, it's serving a
     // stale (non-nulled) custom-properties map → background-color won't update.
-    LOGI("[VYUI_VAR] collect EARLY-RETURN stale-map holder="
-         << static_cast<void *>(holder));
+    printf("[VYUI_VAR] collect EARLY-RETURN stale-map holder=%p\n",
+           static_cast<void *>(holder));
+    fflush(stdout);
     return true;
   }
 

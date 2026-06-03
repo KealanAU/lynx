@@ -35,8 +35,16 @@ jobs:
         uses: ./lynx/.github/actions/common-deps
         with:
           cache-backend: github
-      - name: Build + run dom unittests (incl. DarkModeInlineVarBackgroundRepropagation)
+      - name: Build dom unittests (via RTF) then run the test binary directly
         run: |
-          set -e
           source tools/envsetup.sh
-          tools/rtf/rtf native-ut run --names lynx --target dom_unittest_exec
+          # RTF builds dom_unittest_exec but captures the gtest subprocess output
+          # and only echoes a tail — so per-assertion detail + our [VYUI_VAR]
+          # probes don't reach the console. Let it build (ignore its run result),
+          # then run the binary directly with a filter so the FULL output lands
+          # in this log.
+          tools/rtf/rtf native-ut run --names lynx --target dom_unittest_exec || echo "(rtf run failed as expected — re-running binary directly for full output)"
+          echo "=== direct gtest run (full output incl. [VYUI_VAR]) ==="
+          BIN=$(find out -type f -name dom_unittest_exec | head -1)
+          echo "binary: $BIN"
+          "$BIN" --gtest_filter='*DarkModeInlineVarBackgroundRepropagation*' --gtest_color=no
