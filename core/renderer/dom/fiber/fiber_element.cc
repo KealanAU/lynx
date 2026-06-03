@@ -3689,7 +3689,15 @@ bool FiberElement::IsRelatedCSSVariableUpdated(
                << " incoming=" << value.String().c_str()
                << " related=" << related << " differs=" << differs);
         }
-        if (!changed && differs) {
+        // FIX: invalidate on membership, not on a stored-vs-incoming value
+        // compare. `it->second` is the *resolved* value recorded at resolution
+        // time, while `value` is the *raw* changed value — comparing them with
+        // string equality is unsound for variable-valued tokens (e.g.
+        // `--ui-bg-inverted: var(--ui-color-neutral-900)`) and can wrongly
+        // report "unchanged". `changing_css_variables` is already pre-filtered
+        // to actually-changed vars, and DiffStyleImpl/ComputeUIntStyle dedup at
+        // the value level, so membership is the correct, safe signal.
+        if (!changed && related) {
           changed = true;
         }
       });
