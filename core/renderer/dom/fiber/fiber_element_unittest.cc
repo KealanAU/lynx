@@ -19616,6 +19616,61 @@ TEST_P(FiberElementTest,
   EXPECT_FALSE(page->ShouldFallbackToSerialForNewStylingPipeline());
 }
 
+// [VYUI_VAR] Repro for the native dark-mode propagation bug.
+//
+// A descendant consumes a 2-hop variable:
+//   ancestor inline:  --ui-bg-inverted: var(--ui-color-neutral-900)
+//   child inline:     background-color: var(--ui-bg-inverted)
+// When the ancestor flips --ui-bg-inverted to the *other* ramp ref
+// (var(--ui-color-neutral-50)) at runtime, the child's background-color must
+// re-resolve. The kit reported this specific shape ("Solid never flips"); with
+// the suspected bug the child is never re-resolved and the background stays
+// stale. Uses the kit's dark-mode engine config (both flags on).
+TEST_P(FiberElementTest, DarkModeInlineVarBackgroundRepropagation) {
+  manager->config_->SetEnableCSSInheritance(true);
+  lynx::base::AutoReset<bool> inline_vars(
+      &(manager->GetConfig()->css_configs_.enable_css_inline_variables_), true);
+
+  auto page = manager->CreateFiberPage("0", 0);
+  auto root = manager->CreateFiberView();
+  // Neutral ramp as literals + the inverted surface token as a var ref (2-hop).
+  root->SetRawInlineStyles(
+      "--ui-color-neutral-50:#f8fafc;"
+      "--ui-color-neutral-900:#0f172a;"
+      "--ui-bg-inverted:var(--ui-color-neutral-900);");
+  auto child = manager->CreateFiberView();
+  child->SetRawInlineStyles("background-color:var(--ui-bg-inverted);");
+  root->InsertNode(child);
+  page->InsertNode(root);
+  page->FlushActionsAsRoot();
+
+  // Sanity: the initial resolve produced a background-color on the child.
+  EXPECT_TRUE(child->computed_css_style()->GetChangedBitset().Has(
+      kPropertyIDBackgroundColor))
+      << "setup failed: child background-color did not resolve initially";
+
+  // Toggle: flip the ancestor var to the other ramp end (var -> var), exactly
+  // as the kit's :style dark-mode flip does at runtime.
+  auto vars_dict = lepus::Dictionary::Create();
+  vars_dict->SetValue(base::String("--ui-bg-inverted"),
+                      lepus::Value("var(--ui-color-neutral-50)"));
+  lepus::Value vars(vars_dict);
+  std::shared_ptr<PipelineOptions> options = std::make_shared<PipelineOptions>();
+  root->UpdateCSSVariable(vars, options);
+  page->FlushActionsAsRoot();
+
+  // THE ASSERTION: the child must have re-resolved its background-color in this
+  // flush. Fails if the bug is present (child never re-resolved -> stale bg).
+  //
+  // NOTE: assumes the changed-bitset is per-flush (reset on push, as Lynx does).
+  // If this somehow false-passes, switch to a painting-context capture-count
+  // assertion on kPropertyIDBackgroundColor for child->impl_id() after flush #2.
+  EXPECT_TRUE(child->computed_css_style()->GetChangedBitset().Has(
+      kPropertyIDBackgroundColor))
+      << "child background-color did not re-resolve after ancestor CSS var "
+         "(--ui-bg-inverted) flipped var->var: native dark-mode propagation bug";
+}
+
 INSTANTIATE_TEST_SUITE_P(FiberElementTestModule, FiberElementTest,
                          ::testing::ValuesIn(fiber_element_generation_params));
 

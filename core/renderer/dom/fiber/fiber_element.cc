@@ -3438,8 +3438,13 @@ void FiberElement::RecursivelyMarkChildrenCSSVariableDirty(
     // element's css_variable is with high priority.
     fiber_child->data_model()->MergeWithCSSVariables(
         css_variable_updated_merged);
-    if (IsRelatedCSSVariableUpdated(fiber_child->data_model(),
-                                    css_variable_updated_merged)) {
+    bool child_related = IsRelatedCSSVariableUpdated(
+        fiber_child->data_model(), css_variable_updated_merged);
+    // [VYUI_VAR] dark-mode propagation probe — remove after diagnosis.
+    LOGI("[VYUI_VAR] child holder="
+         << static_cast<void *>(fiber_child->data_model())
+         << " markStyleDirty=" << child_related);
+    if (child_related) {
       fiber_child->MarkStyleDirty(false);
     }
     fiber_child->RecursivelyMarkChildrenCSSVariableDirty(
@@ -3671,12 +3676,21 @@ bool FiberElement::IsRelatedCSSVariableUpdated(
   ForEachLepusValue(
       changing_css_variables,
       [holder, &changed](const lepus::Value &key, const lepus::Value &value) {
-        if (!changed) {
-          auto it = holder->css_variable_related().find(key.String());
-          if (it != holder->css_variable_related().end() &&
-              !it->second.IsEqual(value.String())) {
-            changed = true;
-          }
+        auto it = holder->css_variable_related().find(key.String());
+        bool related = it != holder->css_variable_related().end();
+        bool differs = related && !it->second.IsEqual(value.String());
+        // [VYUI_VAR] dark-mode propagation probe — remove after diagnosis.
+        std::string k(key.String().c_str());
+        if (k.find("ui-bg") != std::string::npos ||
+            k.find("ui-text") != std::string::npos) {
+          LOGI("[VYUI_VAR] gate holder=" << static_cast<void *>(holder)
+               << " key=" << k.c_str()
+               << " stored=" << (related ? it->second.c_str() : "<none>")
+               << " incoming=" << value.String().c_str()
+               << " related=" << related << " differs=" << differs);
+        }
+        if (!changed && differs) {
+          changed = true;
         }
       });
   return changed;
@@ -4942,6 +4956,11 @@ bool FiberElement::IsEventPathCatch(event::EventTarget *target,
 
 bool FiberElement::CollectCustomProperties(AttributeHolder *holder) {
   if (custom_properties_.Get() != nullptr) {
+    // [VYUI_VAR] dark-mode propagation probe — remove after diagnosis.
+    // If this fires for a node whose ancestor var just changed, it's serving a
+    // stale (non-nulled) custom-properties map → background-color won't update.
+    LOGI("[VYUI_VAR] collect EARLY-RETURN stale-map holder="
+         << static_cast<void *>(holder));
     return true;
   }
 

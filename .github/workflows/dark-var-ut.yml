@@ -1,0 +1,42 @@
+name: dark-var-ut
+
+# Minimal, fork-friendly CI to verify the dark-mode CSS-variable repro test
+# (DarkModeInlineVarBackgroundRepropagation in fiber_element_unittest.cc) on a
+# GitHub-hosted runner — no local engine build / 100GB iOS toolchain needed.
+#
+# Scoped to the single `dom_unittest_exec` target so it fits a github-hosted
+# runner's disk + time budget. Triggered on PRs and manually (workflow_dispatch
+# lets you re-run from the Actions tab without pushing).
+on:
+  workflow_dispatch:
+  pull_request:
+
+defaults:
+  run:
+    working-directory: lynx
+
+jobs:
+  dark-var-unittest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Download Source
+        uses: actions/checkout@v4.2.2
+        with:
+          path: lynx
+      - name: Python Setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Common Dependencies
+        # `cache-backend: github` swaps the org-internal lynx-infra cache for the
+        # standard actions/cache so this works on a fork. This step runs
+        # `tools/hab sync` (pulls the host clang/gn/ninja toolchain + gtest).
+        uses: ./lynx/.github/actions/common-deps
+        with:
+          cache-backend: github
+      - name: Build + run dom unittests (incl. DarkModeInlineVarBackgroundRepropagation)
+        run: |
+          set -e
+          source tools/envsetup.sh
+          tools/rtf/rtf native-ut run --names lynx --target dom_unittest_exec
