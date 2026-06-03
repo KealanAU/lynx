@@ -3438,8 +3438,13 @@ void FiberElement::RecursivelyMarkChildrenCSSVariableDirty(
     // element's css_variable is with high priority.
     fiber_child->data_model()->MergeWithCSSVariables(
         css_variable_updated_merged);
-    if (IsRelatedCSSVariableUpdated(fiber_child->data_model(),
-                                    css_variable_updated_merged)) {
+    bool child_related = IsRelatedCSSVariableUpdated(
+        fiber_child->data_model(), css_variable_updated_merged);
+    // [VYUI_VAR] dark-mode propagation probe — remove after diagnosis.
+    printf("[VYUI_VAR] child holder=%p markStyleDirty=%d\n",
+           static_cast<void *>(fiber_child->data_model()), child_related);
+    fflush(stdout);
+    if (child_related) {
       fiber_child->MarkStyleDirty(false);
     }
     fiber_child->RecursivelyMarkChildrenCSSVariableDirty(
@@ -3671,12 +3676,30 @@ bool FiberElement::IsRelatedCSSVariableUpdated(
   ForEachLepusValue(
       changing_css_variables,
       [holder, &changed](const lepus::Value &key, const lepus::Value &value) {
-        if (!changed) {
-          auto it = holder->css_variable_related().find(key.String());
-          if (it != holder->css_variable_related().end() &&
-              !it->second.IsEqual(value.String())) {
-            changed = true;
-          }
+        auto it = holder->css_variable_related().find(key.String());
+        bool related = it != holder->css_variable_related().end();
+        // [VYUI_VAR] dark-mode propagation probe — remove after diagnosis.
+        std::string k(key.String().c_str());
+        if (k.find("ui-bg") != std::string::npos ||
+            k.find("ui-text") != std::string::npos) {
+          printf("[VYUI_VAR] gate holder=%p key=%s stored=%s incoming=%s "
+                 "related=%d differs=%d\n",
+                 static_cast<void *>(holder), k.c_str(),
+                 related ? it->second.c_str() : "<none>",
+                 value.String().c_str(), related,
+                 related && !it->second.IsEqual(value.String()));
+          fflush(stdout);
+        }
+        // FIX: invalidate on membership, not on a stored-vs-incoming value
+        // compare. `it->second` is the *resolved* value recorded at resolution
+        // time, while `value` is the *raw* changed value — comparing them with
+        // string equality is unsound for variable-valued tokens (e.g.
+        // `--ui-bg-inverted: var(--ui-color-neutral-900)`) and can wrongly
+        // report "unchanged". `changing_css_variables` is already pre-filtered
+        // to actually-changed vars, and DiffStyleImpl/ComputeUIntStyle dedup at
+        // the value level, so membership is the correct, safe signal.
+        if (!changed && related) {
+          changed = true;
         }
       });
   return changed;
@@ -4942,6 +4965,12 @@ bool FiberElement::IsEventPathCatch(event::EventTarget *target,
 
 bool FiberElement::CollectCustomProperties(AttributeHolder *holder) {
   if (custom_properties_.Get() != nullptr) {
+    // [VYUI_VAR] dark-mode propagation probe — remove after diagnosis.
+    // If this fires for a node whose ancestor var just changed, it's serving a
+    // stale (non-nulled) custom-properties map → background-color won't update.
+    printf("[VYUI_VAR] collect EARLY-RETURN stale-map holder=%p\n",
+           static_cast<void *>(holder));
+    fflush(stdout);
     return true;
   }
 
