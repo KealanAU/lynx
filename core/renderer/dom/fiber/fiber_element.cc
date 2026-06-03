@@ -3678,7 +3678,6 @@ bool FiberElement::IsRelatedCSSVariableUpdated(
       [holder, &changed](const lepus::Value &key, const lepus::Value &value) {
         auto it = holder->css_variable_related().find(key.String());
         bool related = it != holder->css_variable_related().end();
-        bool differs = related && !it->second.IsEqual(value.String());
         // [VYUI_VAR] dark-mode propagation probe — remove after diagnosis.
         std::string k(key.String().c_str());
         if (k.find("ui-bg") != std::string::npos ||
@@ -3687,7 +3686,8 @@ bool FiberElement::IsRelatedCSSVariableUpdated(
                  "related=%d differs=%d\n",
                  static_cast<void *>(holder), k.c_str(),
                  related ? it->second.c_str() : "<none>",
-                 value.String().c_str(), related, differs);
+                 value.String().c_str(), related,
+                 related && !it->second.IsEqual(value.String()));
           fflush(stdout);
         }
         // FIX: invalidate on membership, not on a stored-vs-incoming value
